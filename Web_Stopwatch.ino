@@ -25,11 +25,13 @@ unsigned long elapsedTime = 0;
 unsigned long accumulatedTime = 0;
 bool running = false;
 
+unsigned long laps[10]; // max 10 laps
+int lapIndex = 0;
+
 int status = WL_IDLE_STATUS;
 WiFiServer server(80);
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
-
 
 #include "icons.h"
 
@@ -58,6 +60,16 @@ const unsigned char *getIcon(const char *icon)
     else if (strcmp(icon, "stopwatch") == 0)
     {
         return epd_bitmap_allArray[3];
+    }
+}
+
+void repeatString(const char *str, int times, char *result)
+{
+    result[0] = '\0';
+
+    for (int i = 0; i < times; ++i)
+    {
+        strcat(result, str);
     }
 }
 
@@ -97,10 +109,39 @@ void setup()
         display.display();
     }
 
+    int frame = 0;
+    const char *dot = ".";
     while (status != WL_CONNECTED)
     {
+
+        char result[100];
+        repeatString(dot, frame + 1, result);
+
         Serial.print("Attempting to connect to SSID: ");
         Serial.println(ssid);
+        display.clearDisplay();
+        display.setCursor(35, 10);
+        display.print("Connecting" + String(result));
+        display.setCursor(35, 20);
+        display.print(ssid);
+        if (frame == 0)
+        {
+            display.drawBitmap(0, 10, getIcon("hourglass_top"), 32, 23, WHITE);
+        }
+        else if (frame == 1)
+        {
+            display.drawBitmap(0, 10, getIcon("hourglass_split"), 32, 23, WHITE);
+        }
+        else if (frame == 2)
+        {
+            display.drawBitmap(0, 10, getIcon("hourglass_bottom"), 32, 23, WHITE);
+        }
+        display.display();
+        frame++;
+        if (frame > 2)
+        {
+            frame = 0;
+        }
         status = WiFi.begin(ssid, pass);
     }
 
@@ -228,6 +269,12 @@ void loop()
                             client.println();
 
                             JSONVar myObject;
+                            JSONVar lapsArray;
+                            for (int i = 0; i < 10; i++)
+                            {
+                                lapsArray[i] = laps[i];
+                            }
+                            myObject["laps"] = lapsArray;
                             myObject["running"] = running;
                             myObject["elapsedTime"] = elapsedTime + (running ? accumulatedTime : 0);
 
@@ -235,6 +282,26 @@ void loop()
                             client.println(jsonString);
 
                             break;
+                        }
+                        else if (currentLine.startsWith("GET /lap"))
+                        {
+                            if (running)
+                            {
+                                int lapsTotalTime;
+
+                                for (int i = 0; i < 10; i++)
+                                {
+                                    lapsTotalTime += laps[i];
+                                }
+
+                                laps[lapIndex] = millis() - startTime - lapsTotalTime;
+
+                                lapIndex++;
+                                if (lapIndex >= 10)
+                                {
+                                    lapIndex = 0;
+                                }
+                            }
                         }
                         currentLine = "";
                     }
@@ -279,11 +346,14 @@ void loop()
     int minutesT = (elapsedTime + (running ? accumulatedTime : 0)) / (1000 * 60) % 60;
     int hoursT = (elapsedTime + (running ? accumulatedTime : 0)) / (1000 * 60 * 60) % 24;
 
+    int lastLap = laps[lapIndex - 1];
+
     display.print(String(hoursT < 10 ? "0" + String(hoursT) : String(hoursT)) + ":" +
                   String(minutesT < 10 ? "0" + String(minutesT) : String(minutesT)) + ":" +
                   String(secondsT < 10 ? "0" + String(secondsT) : String(secondsT)));
     display.setTextSize(1);
     display.print(", " + String(millisecondsT < 10 ? "00" + String(millisecondsT) : millisecondsT < 100 ? "0" + String(millisecondsT) : String(millisecondsT)));
+    
     display.display();
 }
 
