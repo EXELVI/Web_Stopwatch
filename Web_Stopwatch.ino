@@ -1,3 +1,4 @@
+#include <NTPClient.h>
 #include "WiFiS3.h"
 #include <WiFiUdp.h>
 #include <Arduino_JSON.h>
@@ -7,29 +8,28 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include "RTC.h"
-#include <NTPClient.h>
 #include <Arduino_JSON.h>
 
 #include "arduino_secrets.h"
 
+int timeZoneOffsetHours = 2;
+
 const char *ssid = SECRET_SSID;
 const char *pass = SECRET_PASS;
 
-WiFiUDP Udp;
-NTPClient timeClient(Udp);
-
-#define OLED_RESET 4 
-Adafruit_SSD1306 display(OLED_RESET); 
-
+#define OLED_RESET 4
+Adafruit_SSD1306 display(OLED_RESET);
 
 unsigned long startTime = 0;
 unsigned long elapsedTime = 0;
 unsigned long accumulatedTime = 0;
 bool running = false;
 
-int status = WL_IDLE_STATUS; 
-
+int status = WL_IDLE_STATUS;
 WiFiServer server(80);
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP);
+
 
 #include "icons.h"
 
@@ -39,10 +39,9 @@ const unsigned char *epd_bitmap_allArray[4] = {
     epd_bitmap_hourglass_bottom,
     epd_bitmap_hourglass_split,
     epd_bitmap_hourglass_top,
-    epd_bitmap_stopwatch
-};
+    epd_bitmap_stopwatch};
 
-const unsigned char* getIcon(const char *icon)
+const unsigned char *getIcon(const char *icon)
 {
     if (strcmp(icon, "hourglass_bottom") == 0)
     {
@@ -64,20 +63,20 @@ const unsigned char* getIcon(const char *icon)
 
 void setup()
 {
-  
-    Serial.begin(115200);
 
-    display.begin(SSD1306_SWITCHCAPVCC, 0x3C); 
+    Serial.begin(115200);
+    RTC.begin();
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(WHITE);
     display.setCursor(0, 0);
     display.print("Web Stopwatch");
-    display.drawBitmap(0, 7, getIcon("stopwatch"), 32, 23, WHITE); 
+    display.drawBitmap(0, 7, getIcon("stopwatch"), 32, 23, WHITE);
     display.display();
 
     delay(5000);
-    if (WiFi.status() == WL_NO_MODULE) 
+    if (WiFi.status() == WL_NO_MODULE)
     {
         Serial.println("Communication with WiFi module failed!");
         display.clearDisplay();
@@ -88,7 +87,7 @@ void setup()
             ;
     }
 
-    String fv = WiFi.firmwareVersion();   
+    String fv = WiFi.firmwareVersion();
     if (fv < WIFI_FIRMWARE_LATEST_VERSION)
     {
         Serial.println("Please upgrade the firmware");
@@ -102,13 +101,13 @@ void setup()
     {
         Serial.print("Attempting to connect to SSID: ");
         Serial.println(ssid);
-        status = WiFi.begin(ssid, pass); 
+        status = WiFi.begin(ssid, pass);
     }
 
     printWifiStatus();
     delay(5000);
-
     timeClient.begin();
+
     timeClient.update();
 
     auto unixTime = timeClient.getEpochTime();
@@ -146,10 +145,7 @@ void loop()
                         client.println("Content-type:text/html");
                         client.println();
                         client.println("<!DOCTYPE html>");
-                        client.println("<html lang=\"en\" data-bs-theme=\"auto\">");
-                        client.println("");
-                        client.println("<!DOCTYPE html>");
-                        client.println("<html lang=\"en\" data-bs-theme=\"auto\">");
+                        client.println("<html lang=\"en\" data-bs-theme=\"dark\">");
                         client.println("");
                         client.println("<head>");
                         client.println("    <meta charset=\"UTF-8\">");
@@ -259,33 +255,116 @@ void loop()
     }
 
     RTCTime currentTime;
+
     RTC.getTime(currentTime);
+    display.clearDisplay();
+    printWifiBar();
+    display.setCursor(0, 0);
+
+    int adjustedHour = (currentTime.getHour() + timeZoneOffsetHours) % 24;
+    String hours = String(adjustedHour);
+    String minutes = String(currentTime.getMinutes());
+    String seconds = String(currentTime.getSeconds());
+
+    display.print(hours.length() == 1 ? "0" + hours : hours);
+    display.print(":");
+    display.print(minutes.length() == 1 ? "0" + minutes : minutes);
+    display.print(":");
+    display.print(seconds.length() == 1 ? "0" + seconds : seconds);
+    display.setCursor(0, 10);
+    display.setTextSize(2);
+
+    int millisecondsT = (elapsedTime + (running ? accumulatedTime : 0)) % 1000;
+    int secondsT = (elapsedTime + (running ? accumulatedTime : 0)) / 1000 % 60;
+    int minutesT = (elapsedTime + (running ? accumulatedTime : 0)) / (1000 * 60) % 60;
+    int hoursT = (elapsedTime + (running ? accumulatedTime : 0)) / (1000 * 60 * 60) % 24;
+
+    display.print(String(hoursT < 10 ? "0" + String(hoursT) : String(hoursT)) + ":" +
+                  String(minutesT < 10 ? "0" + String(minutesT) : String(minutesT)) + ":" +
+                  String(secondsT < 10 ? "0" + String(secondsT) : String(secondsT)));
+    display.setTextSize(1);
+    display.print(", " + String(millisecondsT < 10 ? "00" + String(millisecondsT) : millisecondsT < 100 ? "0" + String(millisecondsT) : String(millisecondsT)));
+    display.display();
 }
 
+void printWifiBar()
+{
+    long rssi = WiFi.RSSI();
 
+    if (rssi > -55)
+    {
+        display.fillRect(102, 7, 4, 1, WHITE);
+        display.fillRect(107, 6, 4, 2, WHITE);
+        display.fillRect(112, 4, 4, 4, WHITE);
+        display.fillRect(117, 2, 4, 6, WHITE);
+        display.fillRect(122, 0, 4, 8, WHITE);
+    }
+    else if (rssi<-55 & rssi> - 65)
+    {
+        display.fillRect(102, 7, 4, 1, WHITE);
+        display.fillRect(107, 6, 4, 2, WHITE);
+        display.fillRect(112, 4, 4, 4, WHITE);
+        display.fillRect(117, 2, 4, 6, WHITE);
+        display.drawRect(122, 0, 4, 8, WHITE);
+    }
+    else if (rssi<-65 & rssi> - 75)
+    {
+        display.fillRect(102, 7, 4, 1, WHITE);
+        display.fillRect(107, 6, 4, 2, WHITE);
+        display.fillRect(112, 4, 4, 4, WHITE);
+        display.drawRect(117, 2, 4, 6, WHITE);
+        display.drawRect(122, 0, 4, 8, WHITE);
+    }
+    else if (rssi<-75 & rssi> - 85)
+    {
+        display.fillRect(102, 7, 4, 1, WHITE);
+        display.fillRect(107, 6, 4, 2, WHITE);
+        display.drawRect(112, 4, 4, 4, WHITE);
+        display.drawRect(117, 2, 4, 6, WHITE);
+        display.drawRect(122, 0, 4, 8, WHITE);
+    }
+    else if (rssi<-85 & rssi> - 96)
+    {
+        display.fillRect(102, 7, 4, 1, WHITE);
+        display.drawRect(107, 6, 4, 2, WHITE);
+        display.drawRect(112, 4, 4, 4, WHITE);
+        display.drawRect(117, 2, 4, 6, WHITE);
+        display.drawRect(122, 0, 4, 8, WHITE);
+    }
+    else
+    {
+        display.drawRect(102, 7, 4, 1, WHITE);
+        display.drawRect(107, 6, 4, 2, WHITE);
+        display.drawRect(112, 4, 4, 4, WHITE);
+        display.drawRect(117, 2, 4, 6, WHITE);
+        display.drawRect(122, 0, 4, 8, WHITE);
+    }
+}
 
 void printWifiStatus()
 {
-  Serial.print("SSID: ");
-  Serial.println(WiFi.SSID());
-  display.clearDisplay(); 
-  display.setCursor(0, 0);
-  display.print(String(WiFi.SSID()));
+    Serial.print("SSID: ");
+    Serial.println(WiFi.SSID());
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.print(String(WiFi.SSID()));
 
-  IPAddress ip = WiFi.localIP();
-  Serial.print("IP Address: ");
-  Serial.println(ip);
+    IPAddress ip = WiFi.localIP();
+    Serial.print("IP Address: ");
+    Serial.println(ip);
 
-  display.setCursor(0, 20);
-  display.println(ip);
+    display.setCursor(0, 20);
+    display.println(ip);
 
-  long rssi = WiFi.RSSI();
+    long rssi = WiFi.RSSI();
 
-  Serial.print("signal strength (RSSI):");
-  Serial.print(rssi);
-  Serial.println(" dBm");
+    printWifiBar();
 
-  display.setCursor(0, 10);
-  display.print(String(rssi) + " dBm");
-  display.display();
+    Serial.print("signal strength (RSSI):");
+    Serial.print(rssi);
+    Serial.println(" dBm");
+
+    display.setCursor(0, 10);
+    display.print(String(rssi) + " dBm");
+    display.display();
 }
