@@ -14,6 +14,12 @@
 
 int timeZoneOffsetHours = 2;
 
+#define button1pin 2
+#define button2pin 3
+#define button1light 5 //Light inside the button
+#define button2light 6 //Light inside the button
+
+
 const char *ssid = SECRET_SSID;
 const char *pass = SECRET_PASS;
 
@@ -78,6 +84,10 @@ void setup()
 
     Serial.begin(115200);
     RTC.begin();
+    pinMode(button1pin, INPUT_PULLUP);
+    pinMode(button2pin, INPUT_PULLUP);
+    pinMode(button1light, OUTPUT);
+    pinMode(button2light, OUTPUT);
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
     display.clearDisplay();
     display.setTextSize(1);
@@ -164,6 +174,10 @@ void setup()
     server.begin();
 }
 
+unsigned long button1LastPress = 0;
+unsigned long button2LastPress = 0;
+
+
 void loop()
 {
     WiFiClient client = server.available();
@@ -246,7 +260,7 @@ void loop()
                         client.println("            document.getElementById('resetButton').addEventListener('click', async () => { await fetch('/reset', { method: 'GET' }); localElapsedTime = 0; updateTimerDisplay(localElapsedTime); clearInterval(intervalId); });");
                         client.println("            document.getElementById('lapButton').addEventListener('click', async () => { await fetch('/lap', { method: 'GET' }); fetchData(); });");
                         client.println("");
-                        client.println("            fetchData();");
+                        client.println("            setInterval(fetchData, 1000);");
                         client.println("        </script>");
                         client.println("        <script src=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js\"");
                         client.println("            integrity=\"sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz\"");
@@ -344,6 +358,68 @@ void loop()
     {
         accumulatedTime = millis() - startTime;
     }
+
+    //If button 1 is pressed while the stopwatch is running, lap time is recorded
+    //if button 1 is pressed while the stopwatch is stopped, the stopwatch is reset
+    //if button 2 is pressed while the stopwatch is running, the stopwatch is stopped
+    //if button 2 is pressed while the stopwatch is stopped, the stopwatch is started
+    //If stopwatch is running, light up button 2 
+
+    if (digitalRead(button1pin) == LOW && millis() - button1LastPress > 500)
+    {
+        if (running)
+        {
+            int lapsTotalTime = 0;
+
+            for (int i = 0; i < 10; i++)
+            {
+                if (laps[i] > 0)
+                {
+                    lapsTotalTime += laps[i];
+                }
+            }
+
+            laps[lapIndex] = (elapsedTime + accumulatedTime) - lapsTotalTime;
+
+            lapIndex++;
+            if (lapIndex >= 10)
+            {
+                lapIndex = 0;
+            }
+        }
+        else
+        {
+            running = false;
+            elapsedTime = 0;
+            accumulatedTime = 0;
+            lapIndex = 0;
+            for (int i = 0; i < 10; i++)
+            {
+                laps[i] = 0;
+            }
+        }
+
+        button1LastPress = millis();
+    }
+
+    if (digitalRead(button2pin) == LOW && millis() - button2LastPress > 500)
+    {
+        if (running)
+        {
+            elapsedTime += millis() - startTime;
+            running = false;
+            digitalWrite(button2light, LOW);
+        }
+        else
+        {
+            startTime = millis();
+            running = true;
+            digitalWrite(button2light, HIGH);
+        }
+
+        button2LastPress = millis();
+    }
+    
 
     RTCTime currentTime;
 
