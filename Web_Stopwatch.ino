@@ -15,7 +15,9 @@ const char *password = SECRET_PASS;
 WiFiUDP Udp;
 NTPClient timeClient(Udp);
 
-unsigned long startTime;
+unsigned long startTime = 0;
+unsigned long elapsedTime = 0;
+unsigned long accumulatedTime = 0;
 bool running = false;
 
 WiFiServer server(80);
@@ -39,16 +41,16 @@ void setup()
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
 
-    timeClient.begin();  
-    timeClient.update(); 
+    timeClient.begin();
+    timeClient.update();
 
-    auto unixTime = timeClient.getEpochTime(); 
+    auto unixTime = timeClient.getEpochTime();
     Serial.print("Unix time = ");
     Serial.println(unixTime);
     RTCTime timeToSet = RTCTime(unixTime);
-    RTC.setTime(timeToSet);                
+    RTC.setTime(timeToSet);
 
-    RTCTime currentTime; 
+    RTCTime currentTime;
     RTC.getTime(currentTime);
     Serial.println("The RTC was just set to: " + String(currentTime));
 
@@ -83,14 +85,16 @@ void loop()
                         client.println("<p><a href=\"/start\"><button>Start</button></a></p>");
                         client.println("<p><a href=\"/stop\"><button>Stop</button></a></p>");
                         client.println("<p><a href=\"/reset\"><button>Reset</button></a></p>");
+                        client.print("<p>Tempo: ");
                         if (running)
                         {
-                            unsigned long currentTime = millis();
-                            unsigned long elapsedTime = (currentTime - startTime) / 1000;
-                            client.print("<p>Tempo: ");
-                            client.print(elapsedTime);
-                            client.println(" secondi</p>");
+                            client.print((elapsedTime + (millis() - startTime)) / 1000);
                         }
+                        else
+                        {
+                            client.print(elapsedTime / 1000);
+                        }
+                        client.println(" secondi</p>");
                         client.println("</html>");
                         break;
                     }
@@ -98,17 +102,24 @@ void loop()
                     {
                         if (currentLine.startsWith("GET /start"))
                         {
-                            running = true;
-                            startTime = millis();
+                            if (!running)
+                            {
+                                startTime = millis();
+                                running = true;
+                            }
                         }
                         else if (currentLine.startsWith("GET /stop"))
                         {
-                            running = false;
+                            if (running)
+                            {
+                                elapsedTime += millis() - startTime;
+                                running = false;
+                            }
                         }
                         else if (currentLine.startsWith("GET /reset"))
                         {
                             running = false;
-                            startTime = 0;
+                            elapsedTime = 0;
                         }
                         else if (currentLine.startsWith("GET /data"))
                         {
@@ -116,13 +127,9 @@ void loop()
                             client.println("Content-type:application/json");
                             client.println();
 
-                            unsigned long currentTime = millis();
-                            unsigned long elapsedTime = running ? (currentTime - startTime) / 1000 : 0;
-
                             JSONVar myObject;
                             myObject["running"] = running;
-                            myObject["elapsedTime"] = elapsedTime;
-                            myObject["startTime"] = startTime;
+                            myObject["elapsedTime"] = elapsedTime + (running ? accumulatedTime : 0);
 
                             String jsonString = JSON.stringify(myObject);
                             client.println(jsonString);
@@ -141,4 +148,12 @@ void loop()
         client.stop();
         Serial.println("Client disconnected");
     }
+
+    if (running)
+    {
+        accumulatedTime = millis() - startTime;
+    }
+
+    RTCTime currentTime;
+    RTC.getTime(currentTime);
 }
