@@ -1,3 +1,9 @@
+// If button 1 is pressed while the stopwatch is running, lap time is recorded
+// if button 1 is pressed while the stopwatch is stopped, the stopwatch is reset
+// if button 2 is pressed while the stopwatch is running, the stopwatch is stopped
+// if button 2 is pressed while the stopwatch is stopped, the stopwatch is started
+// If stopwatch is running, the button 2 light is on
+
 #include <NTPClient.h>
 #include "WiFiS3.h"
 #include <WiFiUdp.h>
@@ -16,9 +22,8 @@ int timeZoneOffsetHours = 2;
 
 #define button1pin 2
 #define button2pin 3
-#define button1light 5 //Light inside the button
-#define button2light 6 //Light inside the button
-
+#define button1light 5 // Light inside the button
+#define button2light 6 // Light inside the button
 
 const char *ssid = SECRET_SSID;
 const char *pass = SECRET_PASS;
@@ -38,6 +43,7 @@ int status = WL_IDLE_STATUS;
 WiFiServer server(80);
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
+RTCTime currentTime;
 
 #include "icons.h"
 
@@ -167,16 +173,14 @@ void setup()
     RTCTime timeToSet = RTCTime(unixTime);
     RTC.setTime(timeToSet);
 
-    RTCTime currentTime;
     RTC.getTime(currentTime);
     Serial.println("The RTC was just set to: " + String(currentTime));
 
     server.begin();
 }
 
-unsigned long button1LastPress = 0;
-unsigned long button2LastPress = 0;
-
+bool button1Pressed = false;
+bool button2Pressed = false;
 
 void loop()
 {
@@ -260,7 +264,7 @@ void loop()
                         client.println("            document.getElementById('resetButton').addEventListener('click', async () => { await fetch('/reset', { method: 'GET' }); localElapsedTime = 0; updateTimerDisplay(localElapsedTime); clearInterval(intervalId); });");
                         client.println("            document.getElementById('lapButton').addEventListener('click', async () => { await fetch('/lap', { method: 'GET' }); fetchData(); });");
                         client.println("");
-                        client.println("            setInterval(fetchData, 1000);");
+                        client.println("            fetchData();");
                         client.println("        </script>");
                         client.println("        <script src=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js\"");
                         client.println("            integrity=\"sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz\"");
@@ -349,23 +353,24 @@ void loop()
                     currentLine += c;
                 }
             }
+
+            index(false);
         }
         client.stop();
         Serial.println("Client disconnected");
     }
 
+    index(true);
+}
+
+void index(bool updateDisplay)
+{
     if (running)
     {
         accumulatedTime = millis() - startTime;
     }
 
-    //If button 1 is pressed while the stopwatch is running, lap time is recorded
-    //if button 1 is pressed while the stopwatch is stopped, the stopwatch is reset
-    //if button 2 is pressed while the stopwatch is running, the stopwatch is stopped
-    //if button 2 is pressed while the stopwatch is stopped, the stopwatch is started
-    //If stopwatch is running, light up button 2 
-
-    if (digitalRead(button1pin) == LOW && millis() - button1LastPress > 500)
+    if (digitalRead(button1pin) == LOW && button1Pressed == false)
     {
         if (running)
         {
@@ -399,10 +404,14 @@ void loop()
             }
         }
 
-        button1LastPress = millis();
+        button1Pressed = true;
+    }
+    else if (digitalRead(button1pin) == HIGH && button1Pressed == true)
+    {
+        button1Pressed = false;
     }
 
-    if (digitalRead(button2pin) == LOW && millis() - button2LastPress > 500)
+    if (digitalRead(button2pin) == LOW && button2Pressed == false)
     {
         if (running)
         {
@@ -417,56 +426,61 @@ void loop()
             digitalWrite(button2light, HIGH);
         }
 
-        button2LastPress = millis();
+        button2Pressed = true;
     }
-    
-
-    RTCTime currentTime;
-
-    RTC.getTime(currentTime);
-    display.clearDisplay();
-    printWifiBar();
-    display.setCursor(0, 0);
-
-    int adjustedHour = (currentTime.getHour() + timeZoneOffsetHours) % 24;
-    String hours = String(adjustedHour);
-    String minutes = String(currentTime.getMinutes());
-    String seconds = String(currentTime.getSeconds());
-
-    display.print(hours.length() == 1 ? "0" + hours : hours);
-    display.print(":");
-    display.print(minutes.length() == 1 ? "0" + minutes : minutes);
-    display.print(":");
-    display.print(seconds.length() == 1 ? "0" + seconds : seconds);
-    display.setCursor(0, 10);
-    display.setTextSize(2);
-
-    int millisecondsT = (elapsedTime + (running ? accumulatedTime : 0)) % 1000;
-    int secondsT = (elapsedTime + (running ? accumulatedTime : 0)) / 1000 % 60;
-    int minutesT = (elapsedTime + (running ? accumulatedTime : 0)) / (1000 * 60) % 60;
-    int hoursT = (elapsedTime + (running ? accumulatedTime : 0)) / (1000 * 60 * 60) % 24;
-
-    int lastLap = laps[lapIndex - 1];
-
-    display.print(String(hoursT < 10 ? "0" + String(hoursT) : String(hoursT)) + ":" + String(minutesT < 10 ? "0" + String(minutesT) : String(minutesT)) + ":" + String(secondsT < 10 ? "0" + String(secondsT) : String(secondsT)));
-    display.setTextSize(1);
-    display.setCursor(87, 17);
-    display.print("  " + String(millisecondsT < 10 ? "00" + String(millisecondsT) : millisecondsT < 100 ? "0" + String(millisecondsT)
-                                                                                                        : String(millisecondsT)));
-
-    if (lastLap > 0)
+    else if (digitalRead(button2pin) == HIGH && button2Pressed == true)
     {
-
-        int millisecondsL = lastLap % 1000;
-        int secondsL = lastLap / 1000 % 60;
-        int minutesL = lastLap / (1000 * 60) % 60;
-        int hoursL = lastLap / (1000 * 60 * 60) % 24;
-        display.setCursor(0, 25);
-        display.print("Lap: " + String(hoursL < 10 ? "0" + String(hoursL) : String(hoursL)) + ":" + String(minutesL < 10 ? "0" + String(minutesL) : String(minutesL)) + ":" + String(secondsL < 10 ? "0" + String(secondsL) : String(secondsL)) + ", " + String(millisecondsL < 10 ? "00" + String(millisecondsL) : millisecondsL < 100 ? "0" + String(millisecondsL)
-                                                                                                                                                                                                                                                                                                                                        : String(millisecondsL)));
+        button2Pressed = false;
     }
 
-    display.display();
+    if (updateDisplay)
+    {
+        display.clearDisplay();
+        RTC.getTime(currentTime);
+        printWifiBar();
+
+        display.setCursor(0, 0);
+
+        int adjustedHour = (currentTime.getHour() + timeZoneOffsetHours) % 24;
+        String hours = String(adjustedHour);
+        String minutes = String(currentTime.getMinutes());
+        String seconds = String(currentTime.getSeconds());
+
+        display.print(hours.length() == 1 ? "0" + hours : hours);
+        display.print(":");
+        display.print(minutes.length() == 1 ? "0" + minutes : minutes);
+        display.print(":");
+        display.print(seconds.length() == 1 ? "0" + seconds : seconds);
+        display.setCursor(0, 10);
+        display.setTextSize(2);
+
+        int millisecondsT = (elapsedTime + (running ? accumulatedTime : 0)) % 1000;
+        int secondsT = (elapsedTime + (running ? accumulatedTime : 0)) / 1000 % 60;
+        int minutesT = (elapsedTime + (running ? accumulatedTime : 0)) / (1000 * 60) % 60;
+        int hoursT = (elapsedTime + (running ? accumulatedTime : 0)) / (1000 * 60 * 60) % 24;
+
+        int lastLap = laps[lapIndex - 1];
+
+        display.print(String(hoursT < 10 ? "0" + String(hoursT) : String(hoursT)) + ":" + String(minutesT < 10 ? "0" + String(minutesT) : String(minutesT)) + ":" + String(secondsT < 10 ? "0" + String(secondsT) : String(secondsT)));
+        display.setTextSize(1);
+        display.setCursor(87, 17);
+        display.print("  " + String(millisecondsT < 10 ? "00" + String(millisecondsT) : millisecondsT < 100 ? "0" + String(millisecondsT)
+                                                                                                            : String(millisecondsT)));
+
+        if (lastLap > 0)
+        {
+
+            int millisecondsL = lastLap % 1000;
+            int secondsL = lastLap / 1000 % 60;
+            int minutesL = lastLap / (1000 * 60) % 60;
+            int hoursL = lastLap / (1000 * 60 * 60) % 24;
+            display.setCursor(0, 25);
+            display.print("Lap: " + String(hoursL < 10 ? "0" + String(hoursL) : String(hoursL)) + ":" + String(minutesL < 10 ? "0" + String(minutesL) : String(minutesL)) + ":" + String(secondsL < 10 ? "0" + String(secondsL) : String(secondsL)) + ", " + String(millisecondsL < 10 ? "00" + String(millisecondsL) : millisecondsL < 100 ? "0" + String(millisecondsL)
+                                                                                                                                                                                                                                                                                                                                            : String(millisecondsL)));
+        }
+
+        display.display();
+    }
 }
 
 void printWifiBar()
