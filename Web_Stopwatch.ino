@@ -78,23 +78,40 @@ void loop()
                         client.println("HTTP/1.1 200 OK");
                         client.println("Content-type:text/html");
                         client.println();
-
-                        client.println("<!DOCTYPE HTML>");
-                        client.println("<html>");
-                        client.println("<h1>Stopwatch</h1>");
-                        client.println("<p><a href=\"/start\"><button>Start</button></a></p>");
-                        client.println("<p><a href=\"/stop\"><button>Stop</button></a></p>");
-                        client.println("<p><a href=\"/reset\"><button>Reset</button></a></p>");
-                        client.print("<p>Tempo: ");
-                        if (running)
-                        {
-                            client.print((elapsedTime + (millis() - startTime)) / 1000);
-                        }
-                        else
-                        {
-                            client.print(elapsedTime / 1000);
-                        }
-                        client.println(" secondi</p>");
+                        client.println("<!DOCTYPE html>");
+                        client.println("<html lang=\"en\" data-bs-theme=\"dark\">");
+                        client.println("");
+                        client.println("<head>");
+                        client.println("    <meta charset=\"UTF-8\">");
+                        client.println("    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
+                        client.println("    <title>Stopwatch</title>");
+                        client.println("    <link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css\" rel=\"stylesheet\"");
+                        client.println("        integrity=\"sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH\" crossorigin=\"anonymous\">");
+                        client.println("</head>");
+                        client.println("");
+                        client.println("<body>");
+                        client.println("    <div class=\"container mt-5\">");
+                        client.println("        <div class=\"row\">");
+                        client.println("            <div class=\"col text-center\">");
+                        client.println("                <h1 id=\"timer\">00:00:00</h1>");
+                        client.println("                <button id=\"startButton\" class=\"btn btn-success\">Start</button>");
+                        client.println("                <button id=\"stopButton\" class=\"btn btn-danger\">Stop</button>");
+                        client.println("                <button id=\"resetButton\" class=\"btn btn-warning\">Reset</button>");
+                        client.println("            </div>");
+                        client.println("        </div>");
+                        client.println("    </div>");
+                        client.println("    <script>");
+                        client.println("        document.addEventListener(\"DOMContentLoaded\", function () {");
+                        client.println("            document.getElementById('startButton').addEventListener('click', async () => { await fetch('/start'}); });");
+                        client.println("            document.getElementById('stopButton').addEventListener('click', async () => { await fetch('/stop'}); });");
+                        client.println("            document.getElementById('resetButton').addEventListener('click', async () => { await fetch('/reset'); });");
+                        client.println("        });");
+                        client.println("    </script>");
+                        client.println("    <script src=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js\"");
+                        client.println("        integrity=\"sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz\"");
+                        client.println("        crossorigin=\"anonymous\"></script>");
+                        client.println("</body>");
+                        client.println("");
                         client.println("</html>");
                         break;
                     }
