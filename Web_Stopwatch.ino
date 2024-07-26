@@ -191,8 +191,9 @@ void loop()
                         client.println("<head>");
                         client.println("    <meta charset=\"UTF-8\">");
                         client.println("    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
-                        client.println("    <title>Stop Watch</title>");
-                        client.println("    <link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css\" rel=\"stylesheet\" integrity=\"sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH\" crossorigin=\"anonymous\">");
+                        client.println("    <title>Stopwatch</title>");
+                        client.println("    <link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css\" rel=\"stylesheet\"");
+                        client.println("        integrity=\"sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH\" crossorigin=\"anonymous\">");
                         client.println("</head>");
                         client.println("");
                         client.println("<body>");
@@ -203,37 +204,53 @@ void loop()
                         client.println("                <button id=\"startButton\" class=\"btn btn-success\">Start</button>");
                         client.println("                <button id=\"stopButton\" class=\"btn btn-danger\">Stop</button>");
                         client.println("                <button id=\"resetButton\" class=\"btn btn-warning\">Reset</button>");
+                        client.println("                <button id=\"lapButton\" class=\"btn btn-primary\">Lap</button>");
+                        client.println("                <h1>Lap Times</h1>");
+                        client.println("                <ul id=\"lapTimes\" class=\"list-group\"></ul>");
                         client.println("            </div>");
                         client.println("        </div>");
-                        client.println("    </div>");
                         client.println("");
-                        client.println("    <script>");
-                        client.println("        let intervalId;");
-                        client.println("        let startTime;");
-                        client.println("        let localElapsedTime = 0;");
-                        client.println("        let isRunning = false;");
+                        client.println("        <script>");
+                        client.println("            let intervalId;");
+                        client.println("            let startTime;");
+                        client.println("            let localElapsedTime = 0;");
+                        client.println("            let isRunning = false;");
                         client.println("");
-                        client.println("        function updateTimerDisplay(elapsedTime) {");
-                        client.println("            const seconds = Math.floor(elapsedTime / 1000) % 60, minutes = Math.floor(elapsedTime / (1000 * 60)) % 60, hours = Math.floor(elapsedTime / (1000 * 60 * 60)) % 24, ms = elapsedTime % 1000; const display = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')},${String(ms).padStart(3, '0')}`;");
-                        client.println("            document.getElementById('timer').textContent = display;");
-                        client.println("        }");
+                        client.println("            function updateTimerDisplay(elapsedTime) {");
+                        client.println("                const seconds = Math.floor(elapsedTime / 1000) % 60, minutes = Math.floor(elapsedTime / (1000 * 60)) % 60, hours = Math.floor(elapsedTime / (1000 * 60 * 60)) % 24, ms = elapsedTime % 1000; const display = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')},${String(ms).padStart(3, '0')}`;");
+                        client.println("                document.getElementById('timer').textContent = display;");
+                        client.println("            }");
                         client.println("");
-                        client.println("        async function fetchData() {");
-                        client.println("            const res = await fetch('/data'), data = await res.json();");
-                        client.println("            isRunning = data.running; localElapsedTime = data.elapsedTime;");
-                        client.println("            if (isRunning) { startTime = Date.now() - localElapsedTime; updateLocalTimer(); } else { updateTimerDisplay(localElapsedTime); clearInterval(intervalId); }");
-                        client.println("        }");
+                        client.println("            function updateLapTimes(lapTimes) {");
+                        client.println("                const lapTimesElement = document.getElementById('lapTimes'); lapTimesElement.innerHTML = '';");
+                        client.println("                lapTimes.forEach((lapTime, index) => {");
+                        client.println("                    const li = document.createElement('li');");
+                        client.println("                    li.className = 'list-group-item';");
+                        client.println("                    let lapSec = Math.floor(lapTime / 1000) % 60, lapMin = Math.floor(lapTime / (1000 * 60)) % 60, lapHr = Math.floor(lapTime / (1000 * 60 * 60)) % 24, lapMs = lapTime % 1000;");
+                        client.println("                    li.textContent = `Lap ${index + 1}: ${String(lapHr).padStart(2, '0')}:${String(lapMin).padStart(2, '0')}:${String(lapSec).padStart(2, '0')},${String(lapMs).padStart(3, '0')}`;");
+                        client.println("                    lapTimesElement.appendChild(li);");
+                        client.println("                });");
+                        client.println("            }");
                         client.println("");
-                        client.println("        function updateLocalTimer() {");
-                        client.println("            if (isRunning) { intervalId = setInterval(() => { localElapsedTime = Date.now() - startTime; updateTimerDisplay(localElapsedTime); }, 10); }");
-                        client.println("        }");
-                        client.println("        document.getElementById('startButton').addEventListener('click', async () => { await fetch('/start', { method: 'GET' }); fetchData(); });");
-                        client.println("        document.getElementById('stopButton').addEventListener('click', async () => { await fetch('/stop', { method: 'GET' }); isRunning = false; fetchData(); });");
-                        client.println("        document.getElementById('resetButton').addEventListener('click', async () => { await fetch('/reset', { method: 'GET' }); localElapsedTime = 0; updateTimerDisplay(localElapsedTime); clearInterval(intervalId); });");
+                        client.println("            async function fetchData() {");
+                        client.println("                const res = await fetch('/data'), data = await res.json();");
+                        client.println("                isRunning = data.running; localElapsedTime = data.elapsedTime, laps = data.laps;");
+                        client.println("                updateLapTimes(laps); if (isRunning) { startTime = Date.now() - localElapsedTime; updateLocalTimer(); } else { updateTimerDisplay(localElapsedTime); clearInterval(intervalId); }");
+                        client.println("            }");
                         client.println("");
-                        client.println("        fetchData();");
-                        client.println("    </script>");
-                        client.println("    <script src=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js\" integrity=\"sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz\" crossorigin=\"anonymous\"></script>");
+                        client.println("            function updateLocalTimer() {");
+                        client.println("                if (isRunning) { intervalId = setInterval(() => { localElapsedTime = Date.now() - startTime; updateTimerDisplay(localElapsedTime); }, 10); }");
+                        client.println("            }");
+                        client.println("            document.getElementById('startButton').addEventListener('click', async () => { await fetch('/start', { method: 'GET' }); fetchData(); });");
+                        client.println("            document.getElementById('stopButton').addEventListener('click', async () => { await fetch('/stop', { method: 'GET' }); isRunning = false; fetchData(); });");
+                        client.println("            document.getElementById('resetButton').addEventListener('click', async () => { await fetch('/reset', { method: 'GET' }); localElapsedTime = 0; updateTimerDisplay(localElapsedTime); clearInterval(intervalId); });");
+                        client.println("            document.getElementById('lapButton').addEventListener('click', async () => { await fetch('/lap', { method: 'GET' }); fetchData(); });");
+                        client.println("");
+                        client.println("            fetchData();");
+                        client.println("        </script>");
+                        client.println("        <script src=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js\"");
+                        client.println("            integrity=\"sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz\"");
+                        client.println("            crossorigin=\"anonymous\"></script>");
                         client.println("</body>");
                         client.println("");
                         client.println("</html>");
@@ -261,6 +278,12 @@ void loop()
                         {
                             running = false;
                             elapsedTime = 0;
+                            accumulatedTime = 0;
+                            lapIndex = 0;
+                            for (int i = 0; i < 10; i++)
+                            {
+                                laps[i] = 0;
+                            }
                         }
                         else if (currentLine.startsWith("GET /data"))
                         {
@@ -285,22 +308,23 @@ void loop()
                         }
                         else if (currentLine.startsWith("GET /lap"))
                         {
-                            if (running)
-                            {
-                                int lapsTotalTime;
 
-                                for (int i = 0; i < 10; i++)
+                            int lapsTotalTime = 0;
+
+                            for (int i = 0; i < 10; i++)
+                            {
+                                if (laps[i] > 0)
                                 {
                                     lapsTotalTime += laps[i];
                                 }
+                            }
 
-                                laps[lapIndex] = millis() - startTime - lapsTotalTime;
+                            laps[lapIndex] = (elapsedTime + accumulatedTime) - lapsTotalTime;
 
-                                lapIndex++;
-                                if (lapIndex >= 10)
-                                {
-                                    lapIndex = 0;
-                                }
+                            lapIndex++;
+                            if (lapIndex >= 10)
+                            {
+                                lapIndex = 0;
                             }
                         }
                         currentLine = "";
@@ -348,12 +372,24 @@ void loop()
 
     int lastLap = laps[lapIndex - 1];
 
-    display.print(String(hoursT < 10 ? "0" + String(hoursT) : String(hoursT)) + ":" +
-                  String(minutesT < 10 ? "0" + String(minutesT) : String(minutesT)) + ":" +
-                  String(secondsT < 10 ? "0" + String(secondsT) : String(secondsT)));
+    display.print(String(hoursT < 10 ? "0" + String(hoursT) : String(hoursT)) + ":" + String(minutesT < 10 ? "0" + String(minutesT) : String(minutesT)) + ":" + String(secondsT < 10 ? "0" + String(secondsT) : String(secondsT)));
     display.setTextSize(1);
-    display.print(", " + String(millisecondsT < 10 ? "00" + String(millisecondsT) : millisecondsT < 100 ? "0" + String(millisecondsT) : String(millisecondsT)));
-    
+    display.setCursor(87, 17);
+    display.print("  " + String(millisecondsT < 10 ? "00" + String(millisecondsT) : millisecondsT < 100 ? "0" + String(millisecondsT)
+                                                                                                        : String(millisecondsT)));
+
+    if (lastLap > 0)
+    {
+
+        int millisecondsL = lastLap % 1000;
+        int secondsL = lastLap / 1000 % 60;
+        int minutesL = lastLap / (1000 * 60) % 60;
+        int hoursL = lastLap / (1000 * 60 * 60) % 24;
+        display.setCursor(0, 25);
+        display.print("Lap: " + String(hoursL < 10 ? "0" + String(hoursL) : String(hoursL)) + ":" + String(minutesL < 10 ? "0" + String(minutesL) : String(minutesL)) + ":" + String(secondsL < 10 ? "0" + String(secondsL) : String(secondsL)) + ", " + String(millisecondsL < 10 ? "00" + String(millisecondsL) : millisecondsL < 100 ? "0" + String(millisecondsL)
+                                                                                                                                                                                                                                                                                                                                        : String(millisecondsL)));
+    }
+
     display.display();
 }
 
