@@ -1,12 +1,12 @@
-# 🚪 DoorLogger
+# 🚪 Web_Stopwatch
 
-![GitHub last commit](https://img.shields.io/github/last-commit/EXELVI/DoorLogger)
-![GitHub issues](https://img.shields.io/github/issues/EXELVI/DoorLogger)
-![GitHub stars](https://img.shields.io/github/stars/EXELVI/DoorLogger?style=social)
+![GitHub last commit](https://img.shields.io/github/last-commit/EXELVI/Web_Stopwatch)
+![GitHub issues](https://img.shields.io/github/issues/EXELVI/Web_Stopwatch)
+![GitHub stars](https://img.shields.io/github/stars/EXELVI/Web_Stopwatch?style=social)
 
 ## 📜 Description
 
-**DoorLogger** is an advanced Arduino-based project that functions as a Web-connected stopwatch. It is designed to provide precise lap timings, while also being integrated with an OLED display to show real-time data, including network connection status and current time. This project utilizes various libraries to achieve its functionality, including `WiFiS3`, `NTPClient`, and `Adafruit_SSD1306`.
+**Web_Stopwatch** is an advanced Arduino-based project that functions as a Web-connected stopwatch. It is designed to provide precise lap timings, while also being integrated with an OLED display to show real-time data, including network connection status and current time. This project utilizes various libraries to achieve its functionality, including `WiFiS3`, `NTPClient`, and `Adafruit_SSD1306`.
 
 ## 🚀 Features
 
@@ -39,13 +39,13 @@
 1. **Clone the Repository:**
 
     ```bash
-    git clone https://github.com/EXELVI/DoorLogger.git
-    cd DoorLogger
+    git clone https://github.com/EXELVI/Web_Stopwatch.git
+    cd Web_Stopwatch
     ```
 
 2. **Load the Sketch:**
 
-    Open the `DoorLogger.ino` file in your Arduino IDE.
+    Open the `Web_Stopwatch.ino` file in your Arduino IDE.
 
 3. **Configure WiFi:**
 
@@ -84,4 +84,4 @@
 
 ## 🤝 Contributions
 
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/EXELVI/DoorLogger/issues).
+Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/EXELVI/Web_Stopwatch/issues).
